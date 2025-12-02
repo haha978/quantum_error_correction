@@ -9,10 +9,11 @@ def main():
     # The bottom line indicates how rotated surface code is iterated through a model
     # https://quantumcomputing.stackexchange.com/questions/31782/simulating-the-surface-code-with-stim-meaning-of-qubit-coordinates
     
-    num_shots = 1000
-    num_round = 25
+    num_shots = 1
+    num_round = 1
     D = 5
-    p = 0.2
+    # NEED A BETTER ERROR MODEL
+    p = 0
     circuit = Circuit.generated("surface_code:rotated_memory_z", 
                                 distance=D, 
                                 rounds=num_round,
@@ -26,6 +27,7 @@ def main():
     detectors, observables = detector_sampler.sample(num_shots, separate_observables=True)
     sampler = circuit.compile_sampler()
     samples= sampler.sample(num_shots)
+    breakpoint()
     # obs_samples = sampler.sample_observables(num_shots) 
     coords = circuit.get_final_qubit_coordinates()  # list indexed by qubit id
     data_qubits = [qid for qid, xy in coords.items() if xy[0] % 2 == 1 and  xy[1] % 2 == 1]
@@ -34,7 +36,6 @@ def main():
     # Final 25 measurements are the data-qubit readout
     final_data = samples[:, :(D**2 - 1)*num_round].astype(np.uint8).astype(np.float64)
     labels = observables.astype(np.uint8)
-    
     
 
 if __name__ == "__main__":
