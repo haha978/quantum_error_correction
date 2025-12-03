@@ -4,6 +4,7 @@ import numpy as np
 import pymatching
 import matplotlib.pyplot as plt
 import h5py
+import os
 
 def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> stim.Circuit:
     # 1-qubit Clifford gates that appear in surface_code:rotated_memory_z
@@ -80,11 +81,32 @@ def main():
     final_data = samples[:, :(distance**2 - 1)*num_round].astype(np.uint8).astype(np.float64)
     labels = observables.astype(np.uint8)
 
-    # ---- Save to HDF5 ----
-    with h5py.File("surface_code_dataset.h5", "w") as hf:
+    # ---- 3) Save to HDF5 with nice name d{distance}_r{num_round}.h5 ----
+    
+    output_dir = "Uniform_noise"
+    os.makedirs(output_dir, exist_ok=True)
+
+    filename = os.path.join(output_dir, f"d{distance}_r{num_round}.h5")
+
+    with h5py.File(filename, "w") as hf:
+        # Features / labels you already had
         hf.create_dataset("syndromes", data=final_data, compression="gzip")
         hf.create_dataset("detectors", data=detectors, compression="gzip")
         hf.create_dataset("labels", data=labels, compression="gzip")
+        hf.create_dataset("samples", data=samples.astype(np.uint8), compression="gzip")
+        hf.create_dataset("circuit", data=np.array(str(circuit), dtype="S"))
+        hf.create_dataset("detector_error_model", data=np.array(str(dem), dtype="S"))
+
+        # Optional: some metadata / coordinates
+
+        hf.attrs["distance"] = distance
+        hf.attrs["num_round"] = num_round
+        hf.attrs["num_shots"] = num_shots
+        hf.attrs["p1"] = p1
+        hf.attrs["p2"] = p2
+        hf.attrs["pRM"] = pRM
+
+    print(f"Saved dataset to {filename}")
     
 
 if __name__ == "__main__":
