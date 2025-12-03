@@ -5,17 +5,15 @@ import pymatching
 import matplotlib.pyplot as plt
 import h5py
 import os
+import argparse
 
-<<<<<<< HEAD
 def get_args(parser):
     parser.add_argument('--distance', type = int, default = 5, help = "rotated surface code distance (default: 5)")
-    parser.add_argument('--num_rounds', type = int, default = 1000, help = "number of rounds per shot (1000)")
-    parser.add_argument('--num_shots', type = int, default = 500, help = "number of rounds per shot (1000)")
-    parser.add_argument('--output_path', type = str, help = "PATH to output")
+    parser.add_argument('--num_rounds', type = int, default = 1000, help = "number of rounds per shot (default: 1000)")
+    parser.add_argument('--num_shots', type = int, default = 500, help = "number of rounds per shot (default: 500)")
+    parser.add_argument('--output_dir', type = str, default = "Uniform_noise", help = "PATH to output")
     args = parser.parse_args()
     return args
-=======
->>>>>>> 5048898043f63f86ad12c3ecc7c09961abca58fd
 
 def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> stim.Circuit:
     # 1-qubit Clifford gates that appear in surface_code:rotated_memory_z
@@ -75,15 +73,9 @@ def main():
     args = get_args(parser)
     
     #Circuit parameters
-<<<<<<< HEAD
     distance = args.distance
     num_round = args.num_rounds
     num_shots = args.num_shots
-=======
-    distance = 5
-    num_round = 8
-    num_shots = 10**4
->>>>>>> 5048898043f63f86ad12c3ecc7c09961abca58fd
     # Uniform noise in circuit 
     p1 = 0.0005  # single qubit gate noise
     p2 = 0.004 # two qubit gate noise
@@ -115,7 +107,7 @@ def main():
 
     # ---- 3) Save to HDF5 with nice name d{distance}_r{num_round}.h5 ----
     
-    output_dir = "Uniform_noise"
+    output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
     filename = os.path.join(output_dir, f"d{distance}_r{num_round}.h5")
