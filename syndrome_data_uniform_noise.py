@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import h5py
 import os
 
+<<<<<<< HEAD
 def get_args(parser):
     parser.add_argument('--distance', type = int, default = 5, help = "rotated surface code distance (default: 5)")
     parser.add_argument('--num_rounds', type = int, default = 1000, help = "number of rounds per shot (1000)")
@@ -13,6 +14,8 @@ def get_args(parser):
     parser.add_argument('--output_path', type = str, help = "PATH to output")
     args = parser.parse_args()
     return args
+=======
+>>>>>>> 5048898043f63f86ad12c3ecc7c09961abca58fd
 
 def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> stim.Circuit:
     # 1-qubit Clifford gates that appear in surface_code:rotated_memory_z
@@ -21,10 +24,10 @@ def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> s
         "S", "S_DAG",
         "SQRT_X", "SQRT_X_DAG",
         "SQRT_Y", "SQRT_Y_DAG",
-        # Add more if needed - not the case for this project since it's only quantum memory
+        # Add more if needed
     }
 
-    # 2-qubit Clifford gates used (rotated code uses CX)
+    # 2-qubit Clifford gates used
     two_qubit_gates = {
         "CX",
         "CZ",
@@ -34,20 +37,33 @@ def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> s
     out = stim.Circuit()
 
     for inst in base_circuit:
+        # Case 1: it's a REPEAT block -> recurse into the body
+        if isinstance(inst, stim.CircuitRepeatBlock):
+            # Get a copy of the body
+            body = inst.body_copy()
+
+            # Add depolarizing noise *inside* the body
+            noisy_body = add_gate_depolarizing(body, p1, p2)
+
+            # Re-wrap it in a repeat block with the same repeat_count
+            out.append(stim.CircuitRepeatBlock(inst.repeat_count, noisy_body))
+            continue
+
+        # Case 2: it's a normal instruction (CircuitInstruction)
         name = inst.name
 
-        # always copy the original instruction
+        # Always copy the original instruction
         out.append(inst)
 
-        # get all target indices (for H/CX these are qubits)
+        # Targets for this instruction (qubits for H/CX/etc.)
         qubits = [t.value for t in inst.targets_copy()]
 
-        # then insert depolarizing depending on gate type
+        # Then insert depolarizing depending on gate type
         if name in one_qubit_gates and qubits:
             out.append("DEPOLARIZE1", qubits, p1)
 
         elif name in two_qubit_gates and qubits:
-            # DEPOLARIZE2(p) q0 q1 q2 q3 ... applies to pairs (q0,q1), (q2,q3), ...
+            # DEPOLARIZE2(p) q0 q1 q2 q3 ... applies to (q0,q1), (q2,q3), ...
             out.append("DEPOLARIZE2", qubits, p2)
 
     return out
@@ -59,9 +75,15 @@ def main():
     args = get_args(parser)
     
     #Circuit parameters
+<<<<<<< HEAD
     distance = args.distance
     num_round = args.num_rounds
     num_shots = args.num_shots
+=======
+    distance = 5
+    num_round = 8
+    num_shots = 10**4
+>>>>>>> 5048898043f63f86ad12c3ecc7c09961abca58fd
     # Uniform noise in circuit 
     p1 = 0.0005  # single qubit gate noise
     p2 = 0.004 # two qubit gate noise
@@ -105,7 +127,6 @@ def main():
         hf.create_dataset("labels", data=labels, compression="gzip")
         hf.create_dataset("samples", data=samples.astype(np.uint8), compression="gzip")
         hf.create_dataset("circuit", data=np.array(str(circuit), dtype="S"))
-        hf.create_dataset("detector_error_model", data=np.array(str(dem), dtype="S"))
 
         # Optional: some metadata / coordinates
 
