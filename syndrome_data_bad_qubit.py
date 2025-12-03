@@ -134,7 +134,6 @@ def main():
         hf.create_dataset("labels", data=labels, compression="gzip")
         hf.create_dataset("samples", data=samples.astype(np.uint8), compression="gzip")
         hf.create_dataset("circuit", data=np.array(str(circuit), dtype="S"))
-        hf.create_dataset("detector_error_model", data=np.array(str(dem), dtype="S"))
 
         # Optional: some metadata / coordinates
 
