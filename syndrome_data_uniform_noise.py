@@ -6,6 +6,14 @@ import matplotlib.pyplot as plt
 import h5py
 import os
 
+def get_args(parser):
+    parser.add_argument('--distance', type = int, default = 5, help = "rotated surface code distance (default: 5)")
+    parser.add_argument('--num_rounds', type = int, default = 1000, help = "number of rounds per shot (1000)")
+    parser.add_argument('--num_shots', type = int, default = 500, help = "number of rounds per shot (1000)")
+    parser.add_argument('--output_path', type = str, help = "PATH to output")
+    args = parser.parse_args()
+    return args
+
 def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> stim.Circuit:
     # 1-qubit Clifford gates that appear in surface_code:rotated_memory_z
     one_qubit_gates = {
@@ -47,11 +55,13 @@ def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> s
 def main():
     # The bottom line indicates how rotated surface code is iterated through a model
     # https://quantumcomputing.stackexchange.com/questions/31782/simulating-the-surface-code-with-stim-meaning-of-qubit-coordinates
+    parser = argparse.ArgumentParser(description = "Generate data")
+    args = get_args(parser)
     
     #Circuit parameters
-    distance = 5
-    num_round = 1
-    num_shots = 100
+    distance = args.distance
+    num_round = args.num_rounds
+    num_shots = args.num_shots
     # Uniform noise in circuit 
     p1 = 0.0005  # single qubit gate noise
     p2 = 0.004 # two qubit gate noise
