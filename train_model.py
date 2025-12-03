@@ -13,11 +13,44 @@ import torch.utils.data as data
 import h5py
 import argparse
 from datetime import datetime
-# from utils import create_directory
+from Syndrome_dataset import SyndromeDataset
+from utils import create_directory
+
+
+def round_robin_iters(loaders):
+    """
+    Yield batches from multiple dataloaders by alternating between them.
+    Stops once any underlying dataloader is exhausted.
+    """
+    iterators = [iter(dl) for dl in loaders]
+    while True:
+        for idx, it_ in enumerate(iterators):
+            try:
+                yield idx, next(it_)
+            except StopIteration:
+                return
+
+
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size=96, num_layers=2, num_classes=2):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers= num_layers ,
+            batch_first=True
+            )
+        self.fc = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = out[:, -1, :]
+        return self.fc(out)
+
 
 def get_args(parser):
     parser.add_argument('--num_epochs', type = int, default = 100, help = "number of epochs (default: 100)")
-    parser.add_argument('--batch_size', type = int, default = 32, help = "batch size (default: 32)")
+    parser.add_argument('--batch_size', type = int, default = 1024, help = "batch size (default: 32)")
     parser.add_argument('--checkpoint_path', type = str, help = "PATH to checkpoint. Stores number of epochs, optimizer and model states")
     parser.add_argument('--log_path', type = str, help = "PATH to log directory. stores checkpoints and output data.")
     args = parser.parse_args()
@@ -31,81 +64,95 @@ def check_cuda():
     print(torch.cuda.get_device_name(0))
     print(torch.version.cuda)
 
-def validate(loader, model, criterion):
+def validate(loaders, model, criterion):
     model.eval()
     val_loss = 0
     probs = []
     labels = []
+    total_samples = sum(len(dl.dataset) for dl in loaders)
+    if total_samples == 0:
+        return 0, 0
     with torch.no_grad():
-        for idx, (input, target) in enumerate(loader):
+        for _, (input, target) in round_robin_iters(loaders):
             input = input.float().cuda()
-            target = target.float().cuda()
+            target = target.view(-1).long().cuda()
             output = model(input)
             loss = criterion(output, target)
             # update validation loss
             val_loss += loss.item()*input.size(0)
             prob = F.softmax(output, dim=1)[:, 1].clone()
             probs.extend(prob)
-            labels.extend(target[:, 1])
+            labels.extend(target)
     probs = [prob.item() for prob in probs]
     preds = np.array([1 if prob > 0.5 else 0 for prob in probs])
     labels = np.array([label.item() for label in labels])
     val_acc = np.sum(preds == labels)/len(labels)
     # Get Validation Loss
-    val_loss = val_loss/len(loader.dataset)
+    val_loss = val_loss/total_samples if total_samples else 0
     return val_acc, val_loss
         
 def train(loader, model, criterion, optimizer):
-    model.train()    
+    model.train()
     running_loss = 0
-    for i, (input, target) in enumerate(loader):
+    total_samples = sum(len(dl.dataset) for dl in loader)
+    for _, (input, target) in round_robin_iters(loader):
         input = input.float().cuda()
-        target = target.float().cuda()
+        target = target.view(-1).long().cuda()
         output = model(input)
         loss = criterion(output, target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        print(loss.item())
         running_loss += loss.item()*input.size(0)
     
-    return running_loss/len(loader.dataset)
-    
+    return running_loss/total_samples if total_samples else 0
+
+def get_datasets(data_dir_path, D):
+    train_dir = os.path.join(data_dir_path, "train")
+    val_dir = os.path.join(data_dir_path, "validation")
+    test_dir = os.path.join(data_dir_path, "test")
+    datasets_l = []
+    for data_dir in [train_dir, val_dir, test_dir]:
+        data_path_l = [os.path.join(data_dir, fn) for fn in os.listdir(data_dir) if fn[-2:] == 'h5'][:8]
+        datasets = [SyndromeDataset(data_path, D**2 - 1) for data_path in data_path_l]
+        datasets_l.append(datasets)
+    train_datasets, val_datasets, test_datasets = datasets_l[0], datasets_l[1], datasets_l[2]
+    return train_datasets, val_datasets, test_datasets
+
 def main():
-    # parser = argparse.ArgumentParser(description = "Train image model")
-    # args = get_args(parser)
-    BATCH_SIZE = 32
+    parser = argparse.ArgumentParser(description = "Train image model")
+    args = get_args(parser)
+    BATCH_SIZE = args.batch_size
     NUM_WORKERS = 4
+    NUM_EPOCHS = args.num_epochs
+    CHECK_PT_PATH = args.checkpoint_path
+    LOG_PATH = args.log_path
+    create_directory(LOG_PATH)
+    # distance and hidden size
     D = 5
-    H = 128
-    # NUM_EPOCHS = args.num_epochs
-    # CHECK_PT_PATH = args.checkpoint_path
-    # LOG_PATH = args.log_path
-    # create_directory(LOG_PATH)
-    
-    #define model. Final layer has two nodes to computer cross-entropy loss
-    model = nn.LSTM(input_size = D**2, hidden_size = H, num_layers = 2)
-    breakpoint()
-    model.fc = nn.Linear(model.fc.in_features, 2)
-    
+    H = 96
+    DATA_DIR = "/home/leom/code/QEC_data/"
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H)  
+    check_cuda()
     #send model to GPU
     if torch.cuda.is_available():
         model.cuda()
-    # print(model)
     
     # Define cross entropy loss: can change the weight if the two classes are imbalanced
     criterion = nn.CrossEntropyLoss().cuda()
-    
+
     # Define optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-5, momentum=0.9, weight_decay=1e-4)
-    normalize = transforms.Normalize(mean=[0.5],std=[0.1])
-    trans = transforms.Compose([transforms.ToTensor(), normalize])
+    optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=1e-4)
     
     # get dataset and dataloader
-    train_dset = ImageDataset("/home/leom/code/droplet_ML/droplet_data/binary_h5_files/training.h5", trans)
-    val_dset = ImageDataset("/home/leom/code/droplet_ML/droplet_data/binary_h5_files/validation.h5", trans)
-    train_dataloader = DataLoader(train_dset, batch_size=BATCH_SIZE, shuffle=True,
-                num_workers=NUM_WORKERS, pin_memory=False)
-    val_dataloader = DataLoader(val_dset, batch_size=2, shuffle=True, num_workers=NUM_WORKERS, pin_memory=False)
+    train_datasets, val_datasets, test_datasets = get_datasets(DATA_DIR, D)
+    # train_dataset, val_dataset, _ = get_dataset(DATA_DIR, D, preload=True)
+    breakpoint()
+    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True)
+    # val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True)
+    train_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in train_datasets]
+    val_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in val_datasets]
     
     if CHECK_PT_PATH:
         checkpoint = torch.load(CHECK_PT_PATH)
