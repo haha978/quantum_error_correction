@@ -17,6 +17,15 @@ from Syndrome_dataset import SyndromeDataset
 from utils import create_directory
 
 
+def get_args(parser):
+    parser.add_argument('--num_epochs', type = int, default = 100, help = "number of epochs (default: 100)")
+    parser.add_argument('--batch_size', type = int, default = 1024, help = "batch size (default: 32)")
+    parser.add_argument('--checkpoint_path', type = str, help = "PATH to checkpoint. Stores number of epochs, optimizer and model states")
+    parser.add_argument('--log_path', type = str, help = "PATH to log directory. stores checkpoints and output data.")
+    parser.add_argument('--data_dir', type = str, default = "/home/leom/code/QEC_data/", help = "PATH to data directory (train, test, validation)")
+    args = parser.parse_args()
+    return args
+
 def round_robin_iters(loaders):
     """
     Yield batches from multiple dataloaders by alternating between them.
@@ -46,15 +55,6 @@ class LSTMClassifier(nn.Module):
         out, _ = self.lstm(x)
         out = out[:, -1, :]
         return self.fc(out)
-
-
-def get_args(parser):
-    parser.add_argument('--num_epochs', type = int, default = 100, help = "number of epochs (default: 100)")
-    parser.add_argument('--batch_size', type = int, default = 1024, help = "batch size (default: 32)")
-    parser.add_argument('--checkpoint_path', type = str, help = "PATH to checkpoint. Stores number of epochs, optimizer and model states")
-    parser.add_argument('--log_path', type = str, help = "PATH to log directory. stores checkpoints and output data.")
-    args = parser.parse_args()
-    return args
 
 def check_cuda():
     """
@@ -103,7 +103,6 @@ def train(loader, model, criterion, optimizer):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(loss.item())
         running_loss += loss.item()*input.size(0)
     
     return running_loss/total_samples if total_samples else 0
@@ -114,7 +113,7 @@ def get_datasets(data_dir_path, D):
     test_dir = os.path.join(data_dir_path, "test")
     datasets_l = []
     for data_dir in [train_dir, val_dir, test_dir]:
-        data_path_l = [os.path.join(data_dir, fn) for fn in os.listdir(data_dir) if fn[-2:] == 'h5'][:8]
+        data_path_l = [os.path.join(data_dir, fn) for fn in os.listdir(data_dir) if fn[-2:] == 'h5']
         datasets = [SyndromeDataset(data_path, D**2 - 1) for data_path in data_path_l]
         datasets_l.append(datasets)
     train_datasets, val_datasets, test_datasets = datasets_l[0], datasets_l[1], datasets_l[2]
@@ -132,28 +131,34 @@ def main():
     # distance and hidden size
     D = 5
     H = 96
-    DATA_DIR = "/home/leom/code/QEC_data/"
-    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H)  
     check_cuda()
+    DATA_DIR = args.data_dir
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 4)  
     #send model to GPU
     if torch.cuda.is_available():
         model.cuda()
     
-    # Define cross entropy loss: can change the weight if the two classes are imbalanced
-    criterion = nn.CrossEntropyLoss().cuda()
-
-    # Define optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=1e-4)
-    
-    # get dataset and dataloader
     train_datasets, val_datasets, test_datasets = get_datasets(DATA_DIR, D)
-    # train_dataset, val_dataset, _ = get_dataset(DATA_DIR, D, preload=True)
-    breakpoint()
-    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True)
-    # val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True)
     train_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in train_datasets]
     val_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in val_datasets]
     
+    weights = torch.tensor([num_one, num_zero], dtype=torch.float32)
+    if torch.cuda.is_available():
+        weights = weights.cuda()
+    
+    labels = np.concatenate([ds.labels for ds in train_datasets])
+    num_zero = (labels == 0).sum()
+    num_one = labels.size - num_zero
+    
+    # Define cross entropy loss: can change the weight if the two classes are imbalanced
+    criterion = nn.CrossEntropyLoss(weight = weights).cuda()
+
+    # Define optimizer
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    
+    # get dataset and dataloader
+    
+
     if CHECK_PT_PATH:
         checkpoint = torch.load(CHECK_PT_PATH)
         model.load_state_dict(checkpoint['state_dict'])

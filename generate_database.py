@@ -26,8 +26,8 @@ def write_split(src_path, dst_path, indices):
             dst.attrs[k] = v
 
 def main():
-    dir_name = "./Uniform_noise"
-    out_dir_name = "../QEC_data/"
+    dir_name = "./Bad_qubit/"
+    out_dir_name = "../Error_QEC_data/"
     train_frac = 0.80
     val_frac = 0.1
     out_dir_train = os.path.join(out_dir_name, "train")

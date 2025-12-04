@@ -92,18 +92,18 @@ def add_gate_depolarizing_with_bad_qubit(
 def main():
     # Circuit parameters
     distance = 5
-    num_shots = 100  # increase later if you want better statistics
+    num_shots = 100000  # increase later if you want better statistics
 
     # Uniform noise in circuit 
     p1 = 0.0005     # single qubit gate noise
     p2 = 0.004      # two qubit gate noise
     pRM = 0.00195   # reset and measurement noise
 
-    bad_qubit_num = 17   # bad data qubit index
+    bad_qubit_num = 13   # bad data qubit index
     noise_factor = 5.0   # factor by which to increase noise on bad qubit
 
     # Rounds we sweep over: 1, 4, 7, 10, 13, 16
-    round_values = list(range(10, 11, 1))
+    round_values = list(range(2, 22, 2))
 
     output_dir = "Bad_qubit"
     os.makedirs(output_dir, exist_ok=True)
