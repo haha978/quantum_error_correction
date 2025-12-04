@@ -84,7 +84,6 @@ def train(loader, model, criterion, optimizer):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(loss.item())
         running_loss += loss.item()*input.size(0)
     
     return running_loss/total_samples if total_samples else 0
@@ -112,24 +111,31 @@ def main():
     create_directory(LOG_PATH)
     # distance and hidden size
     D = 5
-    H = 96
+    H = 64
     DATA_DIR = "/home/leom/code/QEC_data/"
-    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers=5)  
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 4)  
     check_cuda()
     #send model to GPU
     if torch.cuda.is_available():
         model.cuda()
     
-    # Define cross entropy loss: can change the weight if the two classes are imbalanced
-    criterion = nn.CrossEntropyLoss().cuda()
-
-    # Define optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
-    
     # get dataset and dataloader
     train_dataset, val_dataset, _ = get_dataset(DATA_DIR, D)
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
     val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
+    
+    # Define cross entropy loss: can change the weight if the two classes are imbalanced
+    labels = torch.tensor(train_dataset.labels.flatten(), dtype=torch.long)
+    num_zero = (labels == 0).sum().item()
+    num_one = (labels == 1).sum().item()
+
+    weights = torch.tensor([num_one, num_zero], dtype=torch.float32)
+    if torch.cuda.is_available():
+        weights = weights.cuda()
+    criterion = nn.CrossEntropyLoss(weight=weights).cuda()
+
+    # Define optimizer
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
     
     if CHECK_PT_PATH:
         checkpoint = torch.load(CHECK_PT_PATH)
@@ -164,7 +170,7 @@ def main():
         time_now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         print("This is time now: ", time_now)
         #always save the model and parameter at the end of the iterations!
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             #every forth iteration save
             torch.save(obj, os.path.join(LOG_PATH,'checkpoint_best_{}_{}.pth'.format(epoch, time_now)))
 

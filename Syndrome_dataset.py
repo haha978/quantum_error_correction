@@ -11,7 +11,7 @@ class SyndromeDataset(Dataset):
         self.h5 = None
         if self.preload:
             with h5py.File(self.h5_path, "r") as f:
-                self.syndrome = f["syndromes"][...]
+                self.syndrome = f["detectors"][...]
                 self.labels = f["labels"][...]
         else:
             self._open_file()
@@ -19,7 +19,7 @@ class SyndromeDataset(Dataset):
     def _open_file(self):
         if self.h5 is None:
             self.h5 = h5py.File(self.h5_path, "r")
-            self.syndrome = self.h5["syndromes"]
+            self.syndrome = self.h5["detectors"]
             self.labels = self.h5["labels"]
     
     def __len__(self):
@@ -32,19 +32,6 @@ class SyndromeDataset(Dataset):
         x = x.reshape(-1, self.syndrome_length)
         y = self.labels[idx]
         return x, y
-    
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        if not self.preload:
-            state["h5"] = None
-            state["syndrome"] = None
-            state["labels"] = None
-        return state
-    
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        if not self.preload:
-            self._open_file()
     
     def close(self):
         if self.h5 is not None:
