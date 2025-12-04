@@ -13,15 +13,31 @@ import torch.utils.data as data
 import h5py
 import argparse
 from datetime import datetime
-# from utils import create_directory
+from Syndrome_dataset import SyndromeDataset
+from utils import create_directory
 
 def get_args(parser):
     parser.add_argument('--num_epochs', type = int, default = 100, help = "number of epochs (default: 100)")
-    parser.add_argument('--batch_size', type = int, default = 32, help = "batch size (default: 32)")
+    parser.add_argument('--batch_size', type = int, default = 1024, help = "batch size (default: 32)")
     parser.add_argument('--checkpoint_path', type = str, help = "PATH to checkpoint. Stores number of epochs, optimizer and model states")
     parser.add_argument('--log_path', type = str, help = "PATH to log directory. stores checkpoints and output data.")
     args = parser.parse_args()
     return args
+class LSTMClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size=96, num_layers=2, num_classes=2):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers= num_layers ,
+            batch_first=True
+            )
+        self.fc = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = out[:, -1, :]
+        return self.fc(out)
 
 def check_cuda():
     """
@@ -36,31 +52,33 @@ def validate(loader, model, criterion):
     val_loss = 0
     probs = []
     labels = []
+    total_samples = len(loader.dataset)
     with torch.no_grad():
         for idx, (input, target) in enumerate(loader):
             input = input.float().cuda()
-            target = target.float().cuda()
+            target = target.view(-1).long().cuda()
             output = model(input)
             loss = criterion(output, target)
             # update validation loss
             val_loss += loss.item()*input.size(0)
             prob = F.softmax(output, dim=1)[:, 1].clone()
             probs.extend(prob)
-            labels.extend(target[:, 1])
+            labels.extend(target)
     probs = [prob.item() for prob in probs]
     preds = np.array([1 if prob > 0.5 else 0 for prob in probs])
     labels = np.array([label.item() for label in labels])
     val_acc = np.sum(preds == labels)/len(labels)
     # Get Validation Loss
-    val_loss = val_loss/len(loader.dataset)
+    val_loss = val_loss/total_samples if total_samples else 0
     return val_acc, val_loss
         
 def train(loader, model, criterion, optimizer):
-    model.train()    
+    model.train()
     running_loss = 0
-    for i, (input, target) in enumerate(loader):
+    total_samples = len(loader.dataset)
+    for idx, (input, target) in enumerate(loader):
         input = input.float().cuda()
-        target = target.float().cuda()
+        target = target.view(-1).long().cuda()
         output = model(input)
         loss = criterion(output, target)
         optimizer.zero_grad()
@@ -68,44 +86,56 @@ def train(loader, model, criterion, optimizer):
         optimizer.step()
         running_loss += loss.item()*input.size(0)
     
-    return running_loss/len(loader.dataset)
-    
+    return running_loss/total_samples if total_samples else 0
+
+def get_dataset(data_dir_path, D):
+    train_dir = os.path.join(data_dir_path, "train")
+    val_dir = os.path.join(data_dir_path, "validation")
+    test_dir = os.path.join(data_dir_path, "test")
+    dataset_l = []
+    dataset_nm_l = ["train", "val", "test"]
+    for idx, data_dir in enumerate([train_dir, val_dir, test_dir]):
+        data_path = os.path.join(data_dir, f"d5_r15_{dataset_nm_l[idx]}.h5")
+        dataset = SyndromeDataset(data_path, D**2 - 1)
+        dataset_l.append(dataset)
+    train_datasets, val_datasets, test_datasets = dataset_l[0], dataset_l[1], dataset_l[2]
+    return train_datasets, val_datasets, test_datasets
+
 def main():
-    # parser = argparse.ArgumentParser(description = "Train image model")
-    # args = get_args(parser)
-    BATCH_SIZE = 32
-    NUM_WORKERS = 4
+    parser = argparse.ArgumentParser(description = "Train model")
+    args = get_args(parser)
+    BATCH_SIZE = args.batch_size
+    NUM_EPOCHS = args.num_epochs
+    CHECK_PT_PATH = args.checkpoint_path
+    LOG_PATH = args.log_path
+    create_directory(LOG_PATH)
+    # distance and hidden size
     D = 5
-    H = 128
-    # NUM_EPOCHS = args.num_epochs
-    # CHECK_PT_PATH = args.checkpoint_path
-    # LOG_PATH = args.log_path
-    # create_directory(LOG_PATH)
-    
-    #define model. Final layer has two nodes to computer cross-entropy loss
-    model = nn.LSTM(input_size = D**2, hidden_size = H, num_layers = 2)
-    breakpoint()
-    model.fc = nn.Linear(model.fc.in_features, 2)
-    
+    H = 64
+    DATA_DIR = "/home/leom/code/QEC_data/"
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 4)  
+    check_cuda()
     #send model to GPU
     if torch.cuda.is_available():
         model.cuda()
-    # print(model)
-    
-    # Define cross entropy loss: can change the weight if the two classes are imbalanced
-    criterion = nn.CrossEntropyLoss().cuda()
-    
-    # Define optimizer
-    optimizer = optim.SGD(model.parameters(), lr=1e-5, momentum=0.9, weight_decay=1e-4)
-    normalize = transforms.Normalize(mean=[0.5],std=[0.1])
-    trans = transforms.Compose([transforms.ToTensor(), normalize])
     
     # get dataset and dataloader
-    train_dset = ImageDataset("/home/leom/code/droplet_ML/droplet_data/binary_h5_files/training.h5", trans)
-    val_dset = ImageDataset("/home/leom/code/droplet_ML/droplet_data/binary_h5_files/validation.h5", trans)
-    train_dataloader = DataLoader(train_dset, batch_size=BATCH_SIZE, shuffle=True,
-                num_workers=NUM_WORKERS, pin_memory=False)
-    val_dataloader = DataLoader(val_dset, batch_size=2, shuffle=True, num_workers=NUM_WORKERS, pin_memory=False)
+    train_dataset, val_dataset, _ = get_dataset(DATA_DIR, D)
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
+    
+    # Define cross entropy loss: can change the weight if the two classes are imbalanced
+    labels = torch.tensor(train_dataset.labels.flatten(), dtype=torch.long)
+    num_zero = (labels == 0).sum().item()
+    num_one = (labels == 1).sum().item()
+
+    weights = torch.tensor([num_one, num_zero], dtype=torch.float32)
+    if torch.cuda.is_available():
+        weights = weights.cuda()
+    criterion = nn.CrossEntropyLoss(weight=weights).cuda()
+
+    # Define optimizer
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
     
     if CHECK_PT_PATH:
         checkpoint = torch.load(CHECK_PT_PATH)
@@ -140,7 +170,7 @@ def main():
         time_now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         print("This is time now: ", time_now)
         #always save the model and parameter at the end of the iterations!
-        if epoch % 4 == 0:
+        if epoch % 5 == 0:
             #every forth iteration save
             torch.save(obj, os.path.join(LOG_PATH,'checkpoint_best_{}_{}.pth'.format(epoch, time_now)))
 

@@ -37,8 +37,6 @@ def main():
     create_directory(out_dir_val)
     create_directory(out_dir_test)
     files = [fn for fn in os.listdir(dir_name) if fn[-2:] == 'h5']
-    
-    
     for file in files:
         with h5py.File(os.path.join(dir_name, file), "r") as f:
             n = f["syndromes"].shape[0]
@@ -48,10 +46,5 @@ def main():
         write_split(os.path.join(dir_name, file), os.path.join(out_dir_test, f"{file[:-3]}_test.h5"), test_idx)
         print(f"Done. Train/val/test saved {file}")
         
-
-    
-
-    
-
 if __name__ == '__main__':
     main()
