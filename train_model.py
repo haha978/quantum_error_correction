@@ -23,6 +23,7 @@ def get_args(parser):
     parser.add_argument('--checkpoint_path', type = str, help = "PATH to checkpoint. Stores number of epochs, optimizer and model states")
     parser.add_argument('--log_path', type = str, help = "PATH to log directory. stores checkpoints and output data.")
     parser.add_argument('--data_dir', type = str, default = "/home/leom/code/QEC_data/", help = "PATH to data directory (train, test, validation)")
+    parser.add_argument('--num_layers', type = int, default = 2, help = "PATH to data directory (train, test, validation)")
     args = parser.parse_args()
     return args
 
@@ -49,12 +50,16 @@ class LSTMClassifier(nn.Module):
             num_layers= num_layers ,
             batch_first=True
             )
-        self.fc = nn.Linear(hidden_size, num_classes)
+        self.fc1 = nn.Linear(hidden_size, hidden_size)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
         out, _ = self.lstm(x)
         out = out[:, -1, :]
-        return self.fc(out)
+        out = self.fc1(out)
+        out = self.relu(out)
+        return self.fc2(out)
 
 def check_cuda():
     """
@@ -133,7 +138,7 @@ def main():
     H = 96
     check_cuda()
     DATA_DIR = args.data_dir
-    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 4)  
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = args.num_layers)  
     #send model to GPU
     if torch.cuda.is_available():
         model.cuda()
@@ -142,13 +147,13 @@ def main():
     train_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in train_datasets]
     val_dataloader = [DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True) for ds in val_datasets]
     
-    weights = torch.tensor([num_one, num_zero], dtype=torch.float32)
-    if torch.cuda.is_available():
-        weights = weights.cuda()
-    
     labels = np.concatenate([ds.labels for ds in train_datasets])
     num_zero = (labels == 0).sum()
     num_one = labels.size - num_zero
+    
+    weights = torch.tensor([num_one, num_zero], dtype=torch.float32)
+    if torch.cuda.is_available():
+        weights = weights.cuda()
     
     # Define cross entropy loss: can change the weight if the two classes are imbalanced
     criterion = nn.CrossEntropyLoss(weight = weights).cuda()
@@ -157,8 +162,6 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     
     # get dataset and dataloader
-    
-
     if CHECK_PT_PATH:
         checkpoint = torch.load(CHECK_PT_PATH)
         model.load_state_dict(checkpoint['state_dict'])
@@ -192,7 +195,7 @@ def main():
         time_now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         print("This is time now: ", time_now)
         #always save the model and parameter at the end of the iterations!
-        if epoch % 4 == 0:
+        if epoch % 2 == 0:
             #every forth iteration save
             torch.save(obj, os.path.join(LOG_PATH,'checkpoint_best_{}_{}.pth'.format(epoch, time_now)))
             
