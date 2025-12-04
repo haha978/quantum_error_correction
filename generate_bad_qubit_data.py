@@ -19,6 +19,7 @@ def add_gate_depolarizing_with_bad_qubit(
       - Every 2q Clifford gate gets DEPOLARIZE2(p2)
       - If bad_qubit participates in a gate, its noise is multiplied by `factor`.
 
+    Handles REPEAT blocks by recursing into their bodies.
     Only touches 1q/2q Clifford gates (e.g. H, CX). All other instructions are copied as-is.
     """
 
@@ -28,17 +29,30 @@ def add_gate_depolarizing_with_bad_qubit(
     TWO_QUBIT = {"CX"}      # extend if needed
 
     for inst in base:
+        # --- Case 1: REPEAT block -> recurse into its body ---
+        if isinstance(inst, stim.CircuitRepeatBlock):
+            inner_noisy = add_gate_depolarizing_with_bad_qubit(
+                inst.body_copy(),
+                p1=p1,
+                p2=p2,
+                bad_qubit=bad_qubit,
+                factor=factor,
+            )
+            noisy.append(stim.CircuitRepeatBlock(inst.repeat_count, inner_noisy))
+            continue
+
+        # --- Case 2: normal instruction ---
         name = inst.name
-        targets = list(inst.targets_copy())      # these are GateTarget objects
+        targets = list(inst.targets_copy())      # GateTarget objects
         gate_args = inst.gate_args_copy()
 
-        # 1) Copy the original instruction exactly
+        # 1) copy original instruction exactly
         noisy.append_operation(name, targets, gate_args)
 
-        # We only care about **qubit** targets when deciding where to add noise
+        # 2) figure out which targets are qubits
         qubit_targets = [t.value for t in targets if t.is_qubit_target]
 
-        # ----- Handle 1-qubit Clifford gates -----
+        # ----- 1-qubit Clifford gates -----
         if name in ONE_QUBIT and qubit_targets:
             normal = []
             bad = []
@@ -53,7 +67,7 @@ def add_gate_depolarizing_with_bad_qubit(
             if bad:
                 noisy.append_operation("DEPOLARIZE1", bad, [p1 * factor])
 
-        # ----- Handle 2-qubit Clifford gates -----
+        # ----- 2-qubit Clifford gates -----
         elif name in TWO_QUBIT and qubit_targets:
             assert len(qubit_targets) % 2 == 0, "2q gate must have even # of qubit targets"
 
@@ -89,7 +103,7 @@ def main():
     noise_factor = 5.0   # factor by which to increase noise on bad qubit
 
     # Rounds we sweep over: 1, 4, 7, 10, 13, 16
-    round_values = list(range(1, 17, 3))
+    round_values = list(range(10, 11, 1))
 
     output_dir = "Bad_qubit"
     os.makedirs(output_dir, exist_ok=True)
