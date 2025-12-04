@@ -33,9 +33,11 @@ def main():
     axs[1].set_xlabel('epochs')
     axs[1].set_ylabel('validation accuracy')
     axs[1].legend(fontsize = 8)
-    axs[0].set_title("LSTM Decoder \n" + f"For {os.path.basename(dir_path)}, the best epoch is: {np.argmin(val_loss)}")
+    axs[0].set_title("LSTM Decoder \n" + f"For {os.path.basename(dir_path)}, best epoch: {np.argmin(val_loss)}\n"\
+        + f"val loss: {min(val_loss)}")
+    plt.tight_layout()
     plt.savefig(os.path.join(dir_path, "plot.png"))
-    print( f"For {os.path.basename(dir_path)}, the best epoch is: {np.argmin(val_loss)}")
+    print( f"For {os.path.basename(dir_path)}, best epoch: {np.argmin(val_loss)}")
 
 if __name__ == '__main__':
     main()

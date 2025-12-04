@@ -47,7 +47,6 @@ def test(loader, model, criterion):
     test_loss = test_loss/len(loader.dataset)
     return test_acc, test_loss
 
-
 def main():
     parser = argparse.ArgumentParser(description = "Test LSTM")
     args = get_args(parser)
@@ -57,7 +56,7 @@ def main():
     D = 5
     H = 96
     #define model. Final layer has two nodes to computer cross-entropy loss
-    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 2)
+    model = LSTMClassifier(input_size = D**2 - 1, hidden_size = H, num_layers = 6)
     train_datasets, _, test_datasets = get_datasets(DATA_DIR, D)
     num_rounds = [test_ds.syndrome.shape[1]/test_ds.syndrome_length for test_ds in test_datasets]
     
@@ -86,11 +85,15 @@ def main():
     
     pairs = sorted(zip(num_rounds, test_acc_l), key=lambda x: x[0])
     num_rounds, test_acc_l = zip(*pairs)
-    print(num_rounds)
-    print(test_acc_l)
-    
-    #NEED SAVING STAGE
+    num_rounds = np.array(num_rounds)
+    test_acc_l = np.array(test_acc_l)
 
+    
+    # I want the code to add the checkpoint name when saving (but get rid of .pth)
+    dict1 = {'num_rounds': num_rounds, "test_acc_l": test_acc_l}
+    ckpt_base = os.path.splitext(os.path.basename(CHECK_PT_PATH))[0]
+    out_name = f"test_{ckpt_base}.npy"
+    np.save(os.path.join(args.log_dir, out_name), dict1)
 
 if __name__ == '__main__':
     main()
