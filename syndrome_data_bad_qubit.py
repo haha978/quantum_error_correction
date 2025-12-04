@@ -5,6 +5,15 @@ import pymatching
 import matplotlib.pyplot as plt
 import h5py
 import os
+import argparse
+
+def get_args(parser):
+    parser.add_argument('--distance', type = int, default = 5, help = "rotated surface code distance (default: 5)")
+    parser.add_argument('--num_rounds', type = int, default = 1000, help = "number of rounds per shot (default: 1000)")
+    parser.add_argument('--num_shots', type = int, default = 500, help = "number of rounds per shot (default: 500)")
+    parser.add_argument('--output_dir', type = str, default = "Uniform_noise", help = "PATH to output")
+    args = parser.parse_args()
+    return args
 
 def add_gate_depolarizing_with_bad_qubit(
     base: stim.Circuit,
@@ -78,15 +87,18 @@ def main():
     # The bottom line indicates how rotated surface code is iterated through a model
     # https://quantumcomputing.stackexchange.com/questions/31782/simulating-the-surface-code-with-stim-meaning-of-qubit-coordinates
     
+    parser = argparse.ArgumentParser(description = "Generate data")
+    args = get_args(parser)
+    
     #Circuit parameters
-    distance = 5
-    num_round = 1
-    num_shots = 100
+    distance = args.distance
+    num_round = args.num_rounds
+    num_shots = args.num_shots
     # Uniform noise in circuit 
     p1 = 0.0005  # single qubit gate noise
     p2 = 0.004 # two qubit gate noise
     pRM = 0.00195 #Reset and Measurement noise
-    bad_qubit_num = 17  # Example bad qubit index
+    bad_qubit_num = 13  # Example bad qubit index
     noise_factor = 5.0  # Factor by which to increase noise on bad qu
 
     base = stim.Circuit.generated(

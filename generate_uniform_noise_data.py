@@ -59,7 +59,7 @@ def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> s
 def main():
     # Code distance and shots
     distance = 5
-    num_shots = 10**5
+    num_shots = 100000
 
     # Noise parameters
     p1 = 0.0005   # single qubit gate depolarizing

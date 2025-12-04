@@ -27,11 +27,12 @@ def write_split(src_path, dst_path, indices):
 
 def main():
     dir_name = "./Uniform_noise"
+    out_dir_name = "../QEC_data/"
     train_frac = 0.80
     val_frac = 0.1
-    out_dir_train = os.path.join(dir_name, "train")
-    out_dir_val = os.path.join(dir_name, "validation")
-    out_dir_test = os.path.join(dir_name, "test")
+    out_dir_train = os.path.join(out_dir_name, "train")
+    out_dir_val = os.path.join(out_dir_name, "validation")
+    out_dir_test = os.path.join(out_dir_name, "test")
     
     create_directory(out_dir_train)
     create_directory(out_dir_val)
