@@ -511,11 +511,11 @@ def main():
     p2 = 0.004      # two qubit gate noise
     pRM = 0.00195   # reset and measurement noise
 
-    bad_qubit_num = 17   # bad data qubit index
-    noise_factor = 5.0   # factor by which to increase noise on bad qubit
+    bad_qubit_num = 16   # bad data qubit index
+    noise_factor = 10   # factor by which to increase noise on bad qubit
 
     # Rounds we sweep over: 1, 4, 7, 10, 13, 16
-    round_values = list(range(10, 11, 1))
+    round_values = list(range(20, 21, 1))
 
     for num_round in round_values:
         print(f"Simulating num_round = {num_round}")
@@ -545,13 +545,25 @@ def main():
             separate_observables=True
         )
 
+        sampler = circuit.compile_sampler()
+        samples = sampler.sample(num_shots)
+
+        coords = circuit.get_final_qubit_coordinates()  # dict indexed by qubit id
+        data_qubits = [qid for qid, xy in coords.items() if xy[0] % 2 == 1 and xy[1] % 2 == 1]
+        ancilla_qubits = [qid for qid, xy in coords.items() if qid not in data_qubits]
+        logical_z_qubits = [qid for qid, c in coords.items() if c[0] == 1]
+
+        # Final 25 measurements are the data-qubit readout (your original slice)
+        final_data = samples[:, :(distance**2 - 1) * num_round].astype(np.uint8)
+        labels = observables.astype(np.uint8)
+
         # One heatmap per round (averaged over all shots)
         for r in range(num_round):
             visualize_syndrome_heatmap_for_round(
                 circuit=circuit,
                 distance=distance,
                 num_round=num_round,
-                final_data=detectors,
+                final_data=final_data,
                 round_idx=r,
                 cmap_name="white_to_red",      # or "white_to_rosered" or "Reds"
             )

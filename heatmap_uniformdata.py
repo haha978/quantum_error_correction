@@ -332,27 +332,27 @@ def plot_surface_code_heatmap_layout(
             )
             ax.add_patch(rect)
 
-        for q, (x, y) in anc_pts.items():
-            v = float(ancilla_values.get(q, 0.0))
+    for q, (x, y) in anc_pts.items():
+        v = float(ancilla_values.get(q, 0.0))
 
-            # Boundary plaquette: text goes at the ancilla coordinate (x,y)
-            if q in boundary_blocks:
-                tx, ty = x, y
-            else:
-            # Interior plaquette: center of the square
-                tx, ty = x, y
+        # Boundary plaquette: text goes at the ancilla coordinate (x,y)
+        if q in boundary_blocks:
+            tx, ty = x, y
+        else:
+        # Interior plaquette: center of the square
+            tx, ty = x, y
 
-            ax.text(
-                tx,
-                ty+0.5,
-                f"{v:.2f}",          # format to 2 decimal places
-                ha="center",
-                va="top",
-                fontsize=7,
-                color="black",
-                zorder=20,           # ensure text is on top of the heatmap
-                clip_on=False,
-            )
+        ax.text(
+            tx,
+            ty+0.5,
+            f"{v:.2f}",          # format to 2 decimal places
+            ha="center",
+            va="top",
+            fontsize=7,
+            color="black",
+            zorder=20,           # ensure text is on top of the heatmap
+            clip_on=False,
+        )
 
     # ---- 4) ancilla markers (your orange circles + labels) ----
     for q, (x, y) in anc_pts.items():
@@ -477,10 +477,7 @@ def main():
     pRM = 0.00195 # reset/measurement flip probability
 
     # Enter the round values you want to generate data for
-    round_values = list(range(10,11,1))
-
-    output_dir = "Uniform_noise"
-    os.makedirs(output_dir, exist_ok=True)
+    round_values = list(range(20,21,1))
 
     for num_round in round_values:
         print(f"Generating data for num_round = {num_round}")
@@ -518,7 +515,7 @@ def main():
                 circuit=circuit,
                 distance=distance,
                 num_round=num_round,
-                final_data=detectors,
+                final_data=final_data,
                 round_idx=r,
                 cmap_name="white_to_red",      # or "white_to_rosered" or "Reds"
             )

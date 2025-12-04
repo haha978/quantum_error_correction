@@ -99,11 +99,11 @@ def main():
     p2 = 0.004      # two qubit gate noise
     pRM = 0.00195   # reset and measurement noise
 
-    bad_qubit_num = 13   # bad data qubit index
+    bad_qubit_num = 16   # bad data qubit index
     noise_factor = 5.0   # factor by which to increase noise on bad qubit
 
-    # Rounds we sweep over: 1, 4, 7, 10, 13, 16
-    round_values = list(range(2, 22, 2))
+
+    round_values = list(range(2,22,2))
 
     output_dir = "Bad_qubit"
     os.makedirs(output_dir, exist_ok=True)
