@@ -1,0 +1,2 @@
+python test_intergrated_gradients_Error_run.py --checkpoint /home/leom/code/QEC_data/Bad_QEC_data_9_log/checkpoint_best_26_2025_12_04_20_56_37.pth --train_dir /home/leom/code/QEC_data/Bad_QEC_data_9/train --output /home/leom/code/QEC_data/Bad_QEC_data_9_result --bad_qubit 9
+python test_intergrated_gradients_Error_run.py --checkpoint /home/leom/code/QEC_data/Bad_QEC_data_19_log/checkpoint_best_14_2025_12_04_21_17_02.pth  --train_dir /home/leom/code/QEC_data/Bad_QEC_data_19/train --output /home/leom/code/QEC_data/Bad_QEC_data_19_result --bad_qubit 19

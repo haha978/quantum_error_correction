@@ -115,7 +115,7 @@ def main():
         device=device,
     )
     for round in list(range(2, 21, 2)):
-        data_path = os.path.join("/home/leom/code/QEC_data/Bad_QEC_data_9/test", f"d5_r{round}_b{args.bad_qubit}_f10.0_test.h5")
+        data_path = os.path.join(f"/home/leom/code/QEC_data/Bad_QEC_data_{args.bad_qubit}/test", f"d5_r{round}_b{args.bad_qubit}_f10.0_test.h5")
         dataset = SyndromeDataset(data_path, input_size)
         round_attributions = []  
         for idx in range(len(dataset)):

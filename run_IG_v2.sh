@@ -1,0 +1,2 @@
+python test_intergrated_gradients_Uniform_run.py --checkpoint /home/leom/code/QEC_data/Uniform_6_layers/checkpoint_best_10_2025_12_03_21_08_50.pth --train_dir /home/leom/code/QEC_data/Uniform_QEC_data/train --output /home/leom/code/QEC_data/Uniform_QEC_result/attribution
+python test_intergrated_gradients_Error_run_temp.py --checkpoint /home/leom/code/QEC_data/Error_6_layers/checkpoint_best_10_2025_12_03_22_22_49.pth --bad_qubit 13 --output /home/leom/code/QEC_data/Error_QEC_result/attribution  --train_dir /home/leom/code/QEC_data/Error_QEC_data/train
