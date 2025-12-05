@@ -201,8 +201,8 @@ def plot_surface_code_layout(
             ax.plot(
                 [x1, x2],
                 [y1, y2],
-                color="grey",      # fixed light grey
-                linewidth=2,
+                color="0.6",      # fixed light grey
+                linewidth=1.5,
                 alpha=0.9,
                 zorder=0,
             )
@@ -246,7 +246,7 @@ def plot_surface_code_layout(
             theta1=start_deg,
             theta2=end_deg,
             color="grey",   # grey outline
-            linewidth=2,
+            linewidth=12,
             linestyle="-",
             alpha=0.9,
             zorder=1,
@@ -309,46 +309,45 @@ def plot_surface_code_layout(
         ax.scatter(
             [x],
             [y],
-            marker="o",
-            s=200,
+            marker="s",
+            s=140,
             facecolors="#F28E2B",
-            edgecolors="white",
+            edgecolors="white",       # Rose Medium 
             linewidths=0.1,
-            zorder=5,         # BELOW text
+            zorder=1,
         )
         ax.text(
             x,
-            y,
+            y - 0.07,
             str(q),
             ha="center",
-            va="center",
+            va="top",
             fontsize=8,
-            color="black",
-            zorder=10,        # ABOVE everything else
-            clip_on=False,    # prevents clipping by axes
+            color="white",
+            zorder=4,
         )
 
     # --- 4) Plot data qubits (squares) ---
     for q, (x, y) in data_pts.items():
         ax.scatter(
-            [x], [y],
+            [x],
+            [y],
             marker="s",
-            s=200,
-            facecolors="#4568B0",   
+            s=180,
+            facecolors="#4568B0",       # Blue Medium
             edgecolors="white",
             linewidths=0.2,
-            zorder=5,
+            zorder=1,
         )
         ax.text(
             x,
-            y,
+            y + 0.12,
             str(q),
             ha="center",
-            va="center",            # center vertically
+            va="bottom",
             fontsize=8,
-            color="white",          # good contrast on blue
-            zorder=10,
-            clip_on=False,
+            color="white",
+            zorder=6,
         )
 
     # --- 5) Formatting ---

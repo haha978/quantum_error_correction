@@ -40,19 +40,19 @@ def decode_file(filename: str):
     logical_error_bits = (obs ^ predicted_logical_flips).astype(np.uint8)
     logical_error_rate = logical_error_bits.mean()
 
-    # Optional: conditional error rate given at least one detection event
-    has_any_detection = detectors.any(axis=1)
-    if has_any_detection.any():
-        cond_logical_error_rate = logical_error_bits[has_any_detection].mean()
-    else:
-        cond_logical_error_rate = np.nan
+    # # Optional: conditional error rate given at least one detection event
+    # has_any_detection = detectors.any(axis=1)
+    # if has_any_detection.any():
+    #     cond_logical_error_rate = logical_error_bits[has_any_detection].mean()
+    # else:
+    #     cond_logical_error_rate = np.nan
 
     stats = {
         "distance": distance,
         "num_round": num_round,
         "num_shots": num_shots,
         "logical_error_rate": logical_error_rate,
-        "cond_logical_error_rate": cond_logical_error_rate,
+        # "cond_logical_error_rate": cond_logical_error_rate,
     }
 
     return stats
@@ -60,15 +60,15 @@ def decode_file(filename: str):
 
 def main():
     distance = 5
-    data_dir = "Uniform_noise"
-    round_values = list(range(1, 20, 1))
+    data_dir = "C:/Research_Chaitali/phy191a/Uniform_test/test"
+    round_values = list(range(2, 22, 2))
 
     round_list = []
     ler_list = []
-    ler_cond_list = []
+    # ler_cond_list = []
 
     for num_round in round_values:
-        filename = os.path.join(data_dir, f"d{distance}_r{num_round}.h5")
+        filename = os.path.join(data_dir, f"d{distance}_r{num_round}_test.h5")
         if not os.path.isfile(filename):
             print(f"WARNING: file not found: {filename} – skipping")
             continue
@@ -76,31 +76,104 @@ def main():
         stats = decode_file(filename)
         round_list.append(stats["num_round"])
         ler_list.append(stats["logical_error_rate"])
-        ler_cond_list.append(stats["cond_logical_error_rate"])
+        # ler_cond_list.append(stats["cond_logical_error_rate"])
 
         print(
             f"r = {stats['num_round']:2d} | "
             f"LER = {stats['logical_error_rate']:.3e} | "
-            f"LER | syndrome!=0 = {stats['cond_logical_error_rate']:.3e}"
+            # f"LER | syndrome!=0 = {stats['cond_logical_error_rate']:.3e}"
         )
 
     round_arr = np.array(round_list)
     ler_arr = np.array(ler_list)
-    ler_cond_arr = np.array(ler_cond_list)
+    # ler_cond_arr = np.array(ler_cond_list)
+    arr = np.load("C:/Research_Chaitali/phy191a/test_checkpoint_best_10_2025_12_03_22_22_49.npy", allow_pickle=True)
+    obj = arr.item()
+    num_rounds = np.array(obj["num_rounds"],dtype=float)
+    fidelity = np.array(obj["test_acc_l"],dtype=float)
+    error_rate = 1.0 - fidelity
 
     # Plot logical error rate vs rounds
     plt.figure()
-    plt.plot(round_arr, ler_arr, marker="o", label="Logical Z error rate")
-    plt.plot(round_arr, ler_cond_arr, marker="s", linestyle="--",
-             label="Logical Z error | at least one detection")
+    plt.scatter(round_arr, ler_arr, label="MWPM decoder")
+    plt.scatter(num_rounds, error_rate, label="NN decoder")
+    # plt.plot(round_arr, ler_cond_arr, marker="s", linestyle="--",
+    #          label="Logical Z error | at least one detection")
     plt.xlabel("Number of rounds")
-    plt.ylabel("Error rate")
+    plt.ylabel("Logical Error rate")
     #plt.yscale("log")
-    plt.title(f"MWPM performance vs rounds (d={distance})")
+    plt.title(f"Decoder performance for uniform noise")
     plt.grid(True, which="both", ls="--", alpha=0.5)
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+    ### Testing MWPM performance by incresaing noise factor
+    # data_root = "C:/Research_Chaitali/phy191a/Uniform_noise"
+    # distance = 5
+    # round_values = list(range(2, 22, 2))
+
+    # # Get list of subfolders (test1, test2, ...)
+    # subfolders = [
+    #     name for name in os.listdir(data_root)
+    #     if os.path.isdir(os.path.join(data_root, name))
+    # ]
+
+    # plt.figure()
+
+    # for folder in subfolders:
+    #     data_dir = os.path.join(data_root, folder)
+    #     print(f"\n=== Processing folder: {folder} ===")
+
+    #     round_list = []
+    #     ler_list = []
+
+    #     for num_round in round_values:
+    #         filename = os.path.join(data_dir, f"d{distance}_r{num_round}.h5")
+    #         if not os.path.isfile(filename):
+    #             print(f"  WARNING: missing {filename}")
+    #             continue
+
+    #         stats = decode_file(filename)
+    #         round_list.append(stats["num_round"])
+    #         ler_list.append(stats["logical_error_rate"])
+
+    #         print(f"  r={stats['num_round']:2d}  LER={stats['logical_error_rate']:.3e}")
+
+    #     # Convert to arrays
+    #     if len(round_list) == 0:
+    #         print(f"  Folder {folder} has no usable files — skipping")
+    #         continue
+
+    #     round_arr = np.array(round_list, dtype=float)
+    #     ler_arr = np.array(ler_list, dtype=float)
+
+    #     # Plot MWPM curve for this folder
+    #     plt.scatter(round_arr, ler_arr, label=f"{folder} (MWPM)")
+
+
+    # # ---------------------------------------------------------------
+    # # Add NN curve
+    # arr = np.load(
+    #     "C:/Research_Chaitali/phy191a/test_checkpoint_best_10_2025_12_03_22_22_49.npy",
+    #     allow_pickle=True
+    # )
+    # obj = arr.item()
+
+    # num_rounds = np.array(obj["num_rounds"], dtype=float)
+    # fidelity = np.array(obj["test_acc_l"], dtype=float)
+    # error_rate = 1.0 - fidelity
+
+    # plt.scatter(num_rounds, error_rate, label="NN decoder", marker="x", s=80)
+    # # ---------------------------------------------------------------
+
+    # plt.xlabel("Number of rounds")
+    # plt.ylabel("Logical Error Rate")
+    # plt.title("Decoder performance for uniform noise")
+    # plt.grid(True, which="both", ls="--", alpha=0.5)
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
 
 
 if __name__ == "__main__":

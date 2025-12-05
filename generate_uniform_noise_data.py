@@ -62,14 +62,16 @@ def main():
     num_shots = 100000
 
     # Noise parameters
-    p1 = 0.0005   # single qubit gate depolarizing
-    p2 = 0.004    # two qubit gate depolarizing
-    pRM = 0.00195 # reset/measurement flip probability
+    f = 5  # noise factor
+    p1 = 0.0005*f   # single qubit gate depolarizing
+    p2 = 0.004*f    # two qubit gate depolarizing
+    pRM = 0.00195*f # reset/measurement flip probability
+
 
     #Enter the round values you want to generate data for
-    round_values = list(range(1, 20, 2))
+    round_values = list(range(2, 22, 2))
 
-    output_dir = "Uniform_noise"
+    output_dir = "C:/Research_Chaitali/phy191a/Uniform_noise/test5"
     os.makedirs(output_dir, exist_ok=True)
 
     for num_round in round_values:

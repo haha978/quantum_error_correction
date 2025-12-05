@@ -5,53 +5,8 @@ import itertools
 import math
 from matplotlib.patches import Arc, Wedge, Rectangle
 import os
-
-
-def add_gate_depolarizing(base_circuit: stim.Circuit, p1: float, p2: float) -> stim.Circuit:
-    # 1-qubit Clifford gates that appear in surface_code:rotated_memory_z
-    one_qubit_gates = {
-        "H",
-        "S", "S_DAG",
-        "SQRT_X", "SQRT_X_DAG",
-        "SQRT_Y", "SQRT_Y_DAG",
-        # Add more if needed
-    }
-
-    # 2-qubit Clifford gates used
-    two_qubit_gates = {
-        "CX",
-        "CZ",
-        # Add others if needed
-    }
-
-    out = stim.Circuit()
-
-    for inst in base_circuit:
-        # Case 1: it's a REPEAT block -> recurse into the body
-        if isinstance(inst, stim.CircuitRepeatBlock):
-            body = inst.body_copy()
-            noisy_body = add_gate_depolarizing(body, p1, p2)
-            out.append(stim.CircuitRepeatBlock(inst.repeat_count, noisy_body))
-            continue
-
-        # Case 2: it's a normal instruction (CircuitInstruction)
-        name = inst.name
-
-        # Always copy the original instruction
-        out.append(inst)
-
-        # Targets for this instruction (qubits for H/CX/etc.)
-        qubits = [t.value for t in inst.targets_copy()]
-
-        # Then insert depolarizing depending on gate type
-        if name in one_qubit_gates and qubits:
-            out.append("DEPOLARIZE1", qubits, p1)
-
-        elif name in two_qubit_gates and qubits:
-            # DEPOLARIZE2(p) q0 q1 q2 q3 ... applies to (q0,q1), (q2,q3), ...
-            out.append("DEPOLARIZE2", qubits, p2)
-
-    return out
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib as mpl
 
 
 def get_qubit_coords(circuit: stim.Circuit):
@@ -169,17 +124,10 @@ def get_ancilla_order(circuit: stim.Circuit, ancilla_qubits: set[int]) -> list[i
     return ancilla_order
 
 
-from matplotlib.patches import Arc, Wedge, Rectangle
-from matplotlib.colors import LinearSegmentedColormap
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import math
-import itertools
-
 def plot_surface_code_heatmap_layout(
     circuit: stim.Circuit,
-    ancilla_values: dict[int, float],
-    title: str = "Syndrome heatmap",
+    attributions: dict[int, float],
+    title: str = "Global attribution heatmap",
     vmin: float = 0.0,
     vmax: float = 1.0,
     cmap_name: str = "white_to_red",
@@ -187,19 +135,7 @@ def plot_surface_code_heatmap_layout(
     """
     Draw rotated surface code layout with heatmap colouring of ancilla plaquettes.
 
-    ancilla_values: dict[ancilla_qubit_id -> float in [0,1]]
-                    e.g. probability that syndrome = 1 over shots.
-
-    Colour scheme:
-      - Data qubits:    #4568B0  (your blue)
-      - Ancilla qubits: #F28E2B  (your orange)
-      - Heatmap:
-          if cmap_name == "white_to_red":
-              white -> pure red (#FF0000)
-          if cmap_name == "white_to_rosered":
-              white -> your Rose Medium (#E7115E)
-          else:
-              use any Matplotlib cmap by name, e.g. "Reds"
+    attributions: dict[ancilla_qubit_id -> float in [0,1]]
     """
     coords = get_qubit_coords(circuit)
     data_qubits, ancilla_qubits = classify_qubits(circuit)
@@ -298,10 +234,10 @@ def plot_surface_code_heatmap_layout(
         )
         ax.add_patch(arc)
 
-    # ---- 3) fill plaquettes according to ancilla_values ----
+    # ---- 3) fill plaquettes according to attributions ----
     vals = []
     for q, (x, y) in anc_pts.items():
-        v = float(ancilla_values.get(q, 0.0))
+        v = float(attributions.get(q, 0.0))
         vals.append(v)
         t = (v - vmin) / (vmax - vmin + eps)
         t = min(max(t, 0.0), 1.0)
@@ -332,29 +268,25 @@ def plot_surface_code_heatmap_layout(
             )
             ax.add_patch(rect)
 
+    # ---- labels on ancilla plaquettes ----
     for q, (x, y) in anc_pts.items():
-        v = float(ancilla_values.get(q, 0.0))
+        v = float(attributions.get(q, 0.0))
 
-        # Boundary plaquette: text goes at the ancilla coordinate (x,y)
-        if q in boundary_blocks:
-            tx, ty = x, y
-        else:
-        # Interior plaquette: center of the square
-            tx, ty = x, y
+        tx, ty = x, y  # you can offset if you like
 
         ax.text(
             tx,
-            ty+0.5,
+            ty + 0.5,
             f"{v:.2f}",          # format to 2 decimal places
             ha="center",
             va="top",
             fontsize=7,
             color="black",
-            zorder=20,           # ensure text is on top of the heatmap
+            zorder=20,
             clip_on=False,
         )
 
-    # ---- 4) ancilla markers (your orange circles + labels) ----
+    # ---- ancilla markers (orange circles + labels) ----
     for q, (x, y) in anc_pts.items():
         ax.scatter(
             [x],
@@ -378,7 +310,7 @@ def plot_surface_code_heatmap_layout(
             clip_on=False,
         )
 
-    # ---- 5) data qubits (your blue squares + labels) ----
+    # ---- data qubits (blue squares + labels) ----
     for q, (x, y) in data_pts.items():
         ax.scatter(
             [x],
@@ -416,111 +348,100 @@ def plot_surface_code_heatmap_layout(
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array(vals)
     cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("P(syndrome = 1)")
+    cbar.set_label("Attribution")
 
     plt.show()
 
 
-
-def visualize_syndrome_heatmap_for_round(
-    circuit: stim.Circuit,
+def visualize_heatmap(
     distance: int,
-    num_round: int,
-    final_data: np.ndarray,
-    round_idx: int,
-    title_prefix: str = "Rotated surface code : averaged syndromes",
-    cmap_name: str = "Reds",
+    attribution: np.ndarray,
+    title_prefix: str = "Rotated surface code : Global attribution heatmap",
+    cmap_name: str = "white_to_red",
+    normalize: bool = True,
 ):
     """
-    Build and plot ancilla heatmap for a given round, averaged over shots.
+    Plot a single global attribution heatmap.
 
-    final_data is assumed to be:
-        final_data = samples[:, :(distance**2 - 1) * num_round].astype(np.uint8)
-    with shape (num_shots, num_round * num_ancilla).
+    attribution: 1D array of length num_ancilla
+    normalize: if True, scale to [0,1], else use raw values
     """
-    num_shots = final_data.shape[0]
+
     num_ancilla = distance**2 - 1
 
-    # [shots, rounds, ancilla_index]
-    ancilla_bits = final_data.reshape(num_shots, num_round, num_ancilla)
+    attribution = np.asarray(attribution).flatten()
+    if attribution.shape[0] != num_ancilla:
+        raise ValueError(
+            f"Expected attribution of length {num_ancilla} "
+            f"for distance={distance}, got shape {attribution.shape}"
+        )
 
-    # average over shots for this round
-    mean_per_ancilla = ancilla_bits[:, round_idx, :].mean(axis=0)
+    # --------- NORMALIZATION OPTION ---------
+    if normalize:
+        a_min = attribution.min()
+        a_max = attribution.max()
+
+        if a_max - a_min < 1e-12:
+            # constant array → make everything zero
+            norm_attr = np.zeros_like(attribution, dtype=float)
+        else:
+            norm_attr = (attribution - a_min) / (a_max - a_min)
+
+        attr_to_use = norm_attr
+        vmin, vmax = 0.0, 1.0
+
+    else:
+        # Use raw attribution values
+        attr_to_use = attribution
+        vmin = float(attribution.min())
+        vmax = float(attribution.max())
+
+    # --------- Build circuit layout ---------
+    circuit = stim.Circuit.generated(
+        "surface_code:rotated_memory_z",
+        rounds=1,
+        distance=distance,
+    )
 
     data_qubits, ancilla_qubits = classify_qubits(circuit)
     ancilla_order = get_ancilla_order(circuit, ancilla_qubits)
 
-    ancilla_values = {
-        q: float(mean_per_ancilla[k])
+    # Map ancilla → attribution value
+    attributions_dict = {
+        q: float(attr_to_use[k])
         for k, q in enumerate(ancilla_order)
     }
 
-    title = f"{title_prefix} (round {round_idx+1})"
+    title = f"{title_prefix}"
+
     plot_surface_code_heatmap_layout(
         circuit=circuit,
-        ancilla_values=ancilla_values,
+        attributions=attributions_dict,
         title=title,
-        vmin=0.0,
-        vmax=1.0,
+        vmin=vmin,
+        vmax=vmax,
         cmap_name=cmap_name,
     )
 
 
+
+
 def main():
-    # Code distance and shots
     distance = 5
-    num_shots = 10**5
+    attr = np.load(
+        r"C:/Research_Chaitali/phy191a/global_attribution.npy",
+        allow_pickle=True,
+    )
 
-    # Noise parameters
-    p1 = 0.0005   # single qubit gate depolarizing
-    p2 = 0.004    # two qubit gate depolarizing
-    pRM = 0.00195 # reset/measurement flip probability
+    print("global_attribution shape:", attr.shape)
 
-    # Enter the round values you want to generate data for
-    round_values = list(range(20,21,1))
-
-    for num_round in round_values:
-        print(f"Generating data for num_round = {num_round}")
-
-        # 1) Generate base surface-code memory circuit (no Clifford gate noise yet)
-        base = stim.Circuit.generated(
-            "surface_code:rotated_memory_z",
-            rounds=num_round,
-            distance=distance,
-            after_clifford_depolarization=0.0,
-            after_reset_flip_probability=pRM,
-            before_measure_flip_probability=pRM,
-            before_round_data_depolarization=0.0,
-        )
-
-        # 2) Add gate depolarization (including inside REPEAT blocks)
-        circuit = add_gate_depolarizing(base, p1=p1, p2=p2)
-
-        # 3) Compile samplers
-        detector_sampler = circuit.compile_detector_sampler()
-        detectors, observables = detector_sampler.sample(
-            num_shots,
-            separate_observables=True
-        )
-
-        sampler = circuit.compile_sampler()
-        samples = sampler.sample(num_shots)
-
-        # Keep this as your NN input slice
-        final_data = samples[:, :(distance**2 - 1) * num_round].astype(np.uint8)
-
-        # One heatmap per round (averaged over all shots)
-        for r in range(num_round):
-            visualize_syndrome_heatmap_for_round(
-                circuit=circuit,
-                distance=distance,
-                num_round=num_round,
-                final_data=final_data,
-                round_idx=r,
-                cmap_name="white_to_red",      # or "white_to_rosered" or "Reds"
-            )
+    visualize_heatmap(
+        distance=distance,
+        attribution=attr,
+        normalize=False,
+        cmap_name="white_to_red",  # or "white_to_rosered" or "Reds"
+    )
 
 
 if __name__ == "__main__":
-    
     main()

@@ -60,9 +60,9 @@ def decode_file(filename: str):
 
 def main():
     distance = 5
-    data_dir = "Bad_qubit"
+    data_dir = "C:/Research_Chaitali/phy191a/Error_test/test"
     round_values = list(range(2, 22, 2))
-    bad_qubit = 16
+    bad_qubit = 13
     noise_factor = 5.0 
 
     round_list = []
@@ -70,7 +70,7 @@ def main():
     ler_cond_list = []
 
     for num_round in round_values:
-        filename = os.path.join(data_dir, f"d{distance}_r{num_round}_b{bad_qubit}_f{noise_factor}.h5")
+        filename = os.path.join(data_dir, f"d{distance}_r{num_round}_b{bad_qubit}_f{noise_factor}_test.h5")
         if not os.path.isfile(filename):
             print(f"WARNING: file not found: {filename} – skipping")
             continue
@@ -90,15 +90,23 @@ def main():
     ler_arr = np.array(ler_list)
     ler_cond_arr = np.array(ler_cond_list)
 
+    arr = np.load("C:/Research_Chaitali/phy191a/test_checkpoint_best_10_2025_12_03_21_08_50.npy", allow_pickle=True)
+    obj = arr.item()
+    num_rounds = np.array(obj["num_rounds"],dtype=float)
+    fidelity = np.array(obj["test_acc_l"],dtype=float)
+    error_rate = 1.0 - fidelity
+
     # Plot logical error rate vs rounds
     plt.figure()
-    plt.plot(round_arr, ler_arr, marker="o", label="Logical Z error rate")
-    plt.plot(round_arr, ler_cond_arr, marker="s", linestyle="--",
-             label="Logical Z error | at least one detection")
+    plt.scatter(round_arr, ler_arr, label="MWPM decoder")
+    plt.scatter(num_rounds, error_rate, label="NN decoder")
+    # plt.plot(round_arr, ler_cond_arr, marker="s", linestyle="--",
+    #          label="Logical Z error | at least one detection")
     plt.xlabel("Number of rounds")
-    plt.ylabel("Error rate")
+    plt.ylabel("Logical Error rate")
+    plt.xticks(np.arange(0, 22, 2))
     #plt.yscale("log")
-    plt.title(f"MWPM performance vs rounds (d={distance})")
+    plt.title(f"Decoder performance for noisy qubit")
     plt.grid(True, which="both", ls="--", alpha=0.5)
     plt.legend()
     plt.tight_layout()
