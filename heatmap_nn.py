@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import itertools
 import math
 from matplotlib.patches import Arc, Wedge, Rectangle
-import os
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib as mpl
 
+
+# ----------------- geometry / layout helpers ----------------- #
 
 def get_qubit_coords(circuit: stim.Circuit):
     coords = {}
@@ -124,18 +125,22 @@ def get_ancilla_order(circuit: stim.Circuit, ancilla_qubits: set[int]) -> list[i
     return ancilla_order
 
 
+# ----------------- plotting the layout + heatmap ----------------- #
+
 def plot_surface_code_heatmap_layout(
     circuit: stim.Circuit,
     attributions: dict[int, float],
     title: str = "Global attribution heatmap",
     vmin: float = 0.0,
     vmax: float = 1.0,
-    cmap_name: str = "white_to_red",
+    cmap_name="viridis",        # can be string OR colormap object
 ):
     """
     Draw rotated surface code layout with heatmap colouring of ancilla plaquettes.
 
-    attributions: dict[ancilla_qubit_id -> float in [0,1]]
+    attributions: dict[ancilla_qubit_id -> float]
+    vmin, vmax: color scale limits
+    cmap_name: string name of cmap or actual matplotlib colormap
     """
     coords = get_qubit_coords(circuit)
     data_qubits, ancilla_qubits = classify_qubits(circuit)
@@ -145,19 +150,23 @@ def plot_surface_code_heatmap_layout(
 
     fig, ax = plt.subplots(figsize=(7, 7))
 
-    # ---- choose colormap based on cmap_name ----
-    if cmap_name == "white_to_red":
-        cmap = LinearSegmentedColormap.from_list(
-            "white_to_red",
-            ["#FFFFFF", "#FF0000"]
-        )
-    elif cmap_name == "white_to_rosered":
-        cmap = LinearSegmentedColormap.from_list(
-            "white_to_rosered",
-            ["#FFFFFF", "#E7115E"]
-        )
+    # ---- choose colormap based on cmap_name OR actual colormap ----
+    if isinstance(cmap_name, str):
+        if cmap_name == "white_to_red":
+            cmap = LinearSegmentedColormap.from_list(
+                "white_to_red",
+                ["#FFFFFF", "#FF0000"]
+            )
+        elif cmap_name == "white_to_rosered":
+            cmap = LinearSegmentedColormap.from_list(
+                "white_to_rosered",
+                ["#FFFFFF", "#E7115E"]
+            )
+        else:
+            cmap = plt.get_cmap(cmap_name)  # any standard matplotlib cmap by name
     else:
-        cmap = plt.get_cmap(cmap_name)
+        # Assume user passed a colormap object
+        cmap = cmap_name
 
     eps = 1e-12
 
@@ -353,11 +362,13 @@ def plot_surface_code_heatmap_layout(
     plt.show()
 
 
+# ----------------- main wrapper: normalization + cmap option ----------------- #
+
 def visualize_heatmap(
     distance: int,
     attribution: np.ndarray,
     title_prefix: str = "Rotated surface code : Global attribution heatmap",
-    cmap_name: str = "white_to_red",
+    cmap_name="viridis",
     normalize: bool = True,
 ):
     """
@@ -365,6 +376,7 @@ def visualize_heatmap(
 
     attribution: 1D array of length num_ancilla
     normalize: if True, scale to [0,1], else use raw values
+    cmap_name: string or colormap object passed through to plot_surface_code_heatmap_layout
     """
 
     num_ancilla = distance**2 - 1
@@ -424,7 +436,7 @@ def visualize_heatmap(
     )
 
 
-
+# ----------------- main ----------------- #
 
 def main():
     distance = 5
@@ -438,8 +450,8 @@ def main():
     visualize_heatmap(
         distance=distance,
         attribution=attr,
-        normalize=False,
-        cmap_name="white_to_red",  # or "white_to_rosered" or "Reds"
+        normalize=True,      # or False to use raw values
+        cmap_name="viridis", # or "white_to_red", "white_to_rosered", "Reds", etc.
     )
 
 
