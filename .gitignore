@@ -1,2 +1,5 @@
 venv
 Uniform_noise
+*.png
+*.svg
+*.pdf
